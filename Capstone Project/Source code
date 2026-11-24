@@ -1,1 +1,68 @@
 
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <time.h>
+
+#define LABS 3
+#define PER 5
+#define CPU_LIMIT 90
+#define RAM_LIMIT 90
+
+typedef struct {
+    char id[8];
+    int lab, cpu, ram, disk, net, inUse, faulty;
+    char user[20];
+} Pc;
+
+const char *status(Pc *p) {
+    if (p->faulty) return "FAULTY";
+    if (!p->inUse) return "FREE";
+    return p->cpu < 10 ? "IDLE" : "IN USE";
+}
+
+void sample(Pc *p) {            /* Module 1: data collection */
+    if (p->faulty) return;
+    if (p->inUse) { p->cpu = rand() % 101; p->ram = 30 + rand() % 70; p->net = rand() % 60; }
+    else          { p->cpu = rand() % 6;   p->net = rand() % 3; }
+    p->disk = 30 + rand() % 60;
+}
+
+void login(Pc *p, const char *user) {   /* Module 2: sessions */
+    if (p->faulty || p->inUse) { printf("PC %s unavailable\n", p->id); return; }
+    p->inUse = 1;
+    strncpy(p->user, user, sizeof p->user - 1);
+    printf("LOGIN  %s -> %s\n", user, p->id);
+}
+
+void checkAlerts(Pc *p) {       /* Module 3: alerts */
+    if (p->faulty)             printf("ALERT  %s faulty\n", p->id);
+    else if (p->cpu > CPU_LIMIT) printf("ALERT  %s CPU overload (%d%%)\n", p->id, p->cpu);
+    else if (p->ram > RAM_LIMIT) printf("WARN   %s high memory (%d%%)\n", p->id, p->ram);
+}
+
+int main(void) {
+    Pc pcs[LABS * PER];
+    srand((unsigned)time(NULL));
+    for (int i = 0; i < LABS * PER; i++) {
+        memset(&pcs[i], 0, sizeof(Pc));
+        pcs[i].lab = i / PER;
+        sprintf(pcs[i].id, "%c%02d", 'A' + pcs[i].lab, i % PER + 1);
+        pcs[i].faulty = (rand() % 20 == 0);
+        if (!pcs[i].faulty && rand() % 2) login(&pcs[i], "Student");
+        sample(&pcs[i]);
+    }
+    printf("\nPC   STATUS  CPU RAM DISK NET\n");
+    for (int i = 0; i < LABS * PER; i++) {
+        Pc *p = &pcs[i];
+        printf("%-4s %-7s %3d %3d %4d %3d\n", p->id, status(p), p->cpu, p->ram, p->disk, p->net);
+        checkAlerts(p);
+    }
+    for (int l = 0; l < LABS; l++) {   /* Module 4: report */
+        int used = 0;
+        for (int i = 0; i < LABS * PER; i++)
+            if (pcs[i].lab == l && pcs[i].inUse) used++;
+        printf("Lab %c: %d/%d in use (%d%%)\n", 'A' + l, used, PER, used * 100 / PER);
+    }
+    return 0;
+}
